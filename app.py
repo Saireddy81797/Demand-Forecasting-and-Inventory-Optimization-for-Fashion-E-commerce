@@ -14,9 +14,17 @@ df = pd.read_csv("sales_data_medium.csv")
 df['order_date'] = pd.to_datetime(df['order_date'])
 
 # --------------------------
-# Load trained LightGBM model
+# Train a small LightGBM model for demo
 # --------------------------
-model = lgb.Booster(model_file='model.txt')  # make sure model.txt exists
+features = ['qty','price','discount']
+X = df[features]
+y = df['qty']
+train_data = lgb.Dataset(X, label=y)
+model = lgb.train(
+    {'objective':'regression','metric':'mae'},
+    train_data,
+    num_boost_round=10  # small rounds for demo speed
+)
 
 # --------------------------
 # Sidebar: Select SKU & Warehouse
@@ -36,12 +44,10 @@ sku_data = df[(df['sku'] == selected_sku) & (df['warehouse_id'] == selected_wh)]
 sku_data = sku_data.sort_values('order_date')
 
 # --------------------------
-# Feature engineering (simplified)
+# Predict using the demo model
 # --------------------------
-# NOTE: must match features used in training LightGBM
-features = ['qty','price','discount']
-X = sku_data[features]
-sku_data['pred'] = model.predict(X)
+X_sku = sku_data[features]
+sku_data['pred'] = model.predict(X_sku)
 
 # --------------------------
 # 1. Actual vs Predicted Plot
@@ -62,10 +68,7 @@ st.pyplot(fig)
 avg_demand = sku_data['qty'].mean()
 std_demand = sku_data['qty'].std()
 lead_time = 7
-z = 1.65  # for ~95% service level, you can adjust based on slider
-if service_level != 95:
-    z = np.abs(np.round(np.random.normal(1.0,0.1),2))  # simple approx
-
+z = 1.65 if service_level==95 else np.abs(np.round(np.random.normal(1.0,0.1),2))
 safety_stock = z * std_demand * np.sqrt(lead_time)
 reorder_point = avg_demand * lead_time + safety_stock
 
